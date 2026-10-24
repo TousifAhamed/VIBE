@@ -10,3 +10,4 @@ tsconfig*.json
 esbuild.mjs
 .gitignore
 dist/**/*.map
+.github/**
