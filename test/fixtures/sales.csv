@@ -1,0 +1,11 @@
+order_id,region,product,units,revenue,order_date
+1,North,Widget,12,240.50,2026-01-03
+2,South,Gadget,5,175.00,2026-01-04
+3,East,Widget,7,140.25,2026-01-04
+4,West,Gizmo,20,600.00,2026-01-05
+5,North,Gadget,3,105.00,2026-01-06
+6,South,Widget,9,180.00,2026-01-07
+7,East,Gizmo,11,330.00,2026-01-08
+8,North,Gizmo,4,120.00,2026-01-09
+9,West,Widget,15,300.00,2026-01-10
+10,"South, Coastal",Gadget,8,280.00,2026-01-11

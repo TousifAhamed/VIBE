@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "outDir": "out-test", "noEmit": false },
+  "include": ["src/engine", "src/protocol.ts", "src/controller.ts", "test"]
+}
