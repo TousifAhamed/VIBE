@@ -1,0 +1,4 @@
+id	city	population
+1	Oslo	709000
+2	Bergen	291000
+3	Trondheim	212000

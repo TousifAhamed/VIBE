@@ -1,0 +1,67 @@
+{
+  "name": "vibe-analytics",
+  "displayName": "VIBE Analytics",
+  "description": "Fast, in-editor data analysis: load CSV, TXT and Excel files into an in-memory DuckDB engine and explore them in a virtualized grid and interactive charts.",
+  "version": "0.1.0",
+  "publisher": "tousifahamed",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Data Science",
+    "Visualization"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "vibe.openPanel",
+        "title": "Open Data Panel",
+        "category": "VIBE"
+      },
+      {
+        "command": "vibe.loadFile",
+        "title": "Load Data File…",
+        "category": "VIBE"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "vibe.loadFile",
+          "when": "resourceExtname =~ /\\.(csv|tsv|txt|xlsx)$/i",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p webview",
+    "test": "npm run build && tsc -p tsconfig.test.json && node --test out-test/test/*.test.js",
+    "preview": "npm run build && node scripts/preview.mjs",
+    "package": "node esbuild.mjs --production && vsce package"
+  },
+  "dependencies": {
+    "@duckdb/node-api": "1.5.6-r.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.0",
+    "@types/vscode": "1.95.0",
+    "@vscode/vsce": "^3.7.1",
+    "echarts": "^6.1.0",
+    "esbuild": "0.28.2",
+    "exceljs": "4.4.0",
+    "typescript": "5.9.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TousifAhamed/vibe"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
+  }
+}

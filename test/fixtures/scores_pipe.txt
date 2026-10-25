@@ -1,0 +1,5 @@
+id|name|score
+1|Alice|91.5
+2|Bob|78
+3|Carol|88.25
+4|Dan|65

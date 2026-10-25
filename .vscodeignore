@@ -1,0 +1,14 @@
+src/**
+webview/**
+test/**
+scripts/**
+out/**
+out-test/**
+**/*.ts
+!dist/**
+tsconfig*.json
+esbuild.mjs
+.gitignore
+dist/**/*.map
+.github/**
+.vscode/**

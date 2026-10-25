@@ -1,0 +1,4 @@
+code;label;amount
+A;Alpha;1,5
+B;Beta;2,25
+C;Gamma;3
