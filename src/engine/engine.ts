@@ -7,6 +7,48 @@ import { readExcel } from './excel';
 
 export const SUPPORTED_EXTENSIONS = ['.csv', '.tsv', '.txt', '.xlsx'];
 
+export interface ImportColumn {
+  name: string;
+  /** DuckDB type the text values are cast to. */
+  duckType: string;
+}
+
+export interface ImportOptions {
+  /** Stop after this many rows (0 or undefined means no limit). */
+  maxRows?: number;
+  onProgress?: (rows: number) => void;
+  isCancelled?: () => boolean;
+}
+
+export interface ImportResult {
+  table: TableInfo;
+  /** True when `maxRows` cut the result short. */
+  truncated: boolean;
+}
+
+export class ImportCancelled extends Error {
+  constructor() {
+    super('Import cancelled');
+  }
+}
+
+/** Rows staged as text before they are cast into the final table. */
+const IMPORT_CHUNK = 100_000;
+
+/** Fills in blank names and suffixes duplicates, as SQL results often repeat column names. */
+export function uniqueColumnNames(names: string[]): string[] {
+  const seen = new Set<string>();
+  return names.map((raw, i) => {
+    const base = raw.trim() || `column${i + 1}`;
+    let name = base;
+    for (let n = 1; seen.has(name.toLowerCase()); n++) {
+      name = `${base}_${n}`;
+    }
+    seen.add(name.toLowerCase());
+    return name;
+  });
+}
+
 export function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
@@ -137,6 +179,101 @@ export class DataEngine {
       loaded.push(await this.register(name, sheets.length === 1 ? file : `${file} [${sheet.name}]`));
     }
     return loaded;
+  }
+
+  /**
+   * Streams batches of text rows into a new table. Batches are staged as
+   * VARCHAR and cast to each column's type in bulk, and the next batch is
+   * fetched while the current one is being appended.
+   */
+  async importRows(
+    baseName: string,
+    source: string,
+    columns: ImportColumn[],
+    next: () => Promise<(string | null)[][]>,
+    opts: ImportOptions = {},
+  ): Promise<ImportResult> {
+    if (columns.length === 0) {
+      throw new Error('The query returned no columns');
+    }
+    const name = this.uniqueName(baseName);
+    const staging = `__import_${name}`;
+    const names = uniqueColumnNames(columns.map((c) => c.name));
+    const target = quoteIdent(name);
+    await this.conn.run(`CREATE TABLE ${target} (${names.map((n, i) => `${quoteIdent(n)} ${columns[i].duckType}`).join(', ')})`);
+    await this.conn.run(`CREATE TEMP TABLE ${quoteIdent(staging)} (${names.map((n) => `${quoteIdent(n)} VARCHAR`).join(', ')})`);
+    const casts = names
+      .map((n, i) => (columns[i].duckType === 'VARCHAR' ? quoteIdent(n) : `TRY_CAST(${quoteIdent(n)} AS ${columns[i].duckType})`))
+      .join(', ');
+    const flush = async () => {
+      await this.conn.run(`INSERT INTO ${target} SELECT ${casts} FROM temp.${quoteIdent(staging)}`);
+      await this.conn.run(`DELETE FROM temp.${quoteIdent(staging)}`);
+    };
+
+    const limit = opts.maxRows && opts.maxRows > 0 ? opts.maxRows : Infinity;
+    let total = 0;
+    let staged = 0;
+    let truncated = false;
+    // A fetch still in flight when the import stops must not surface as an unhandled rejection.
+    const fetchNext = () => {
+      const p = next();
+      p.catch(() => undefined);
+      return p;
+    };
+    let appender = await this.conn.createAppender(staging, 'main', 'temp');
+    try {
+      let pending = fetchNext();
+      for (;;) {
+        const batch = await pending;
+        if (batch.length === 0) {
+          break;
+        }
+        if (opts.isCancelled?.()) {
+          throw new ImportCancelled();
+        }
+        const take = Math.min(batch.length, limit - total);
+        // Fetch ahead unless this batch already reaches the row limit.
+        pending = take < batch.length || total + take >= limit ? Promise.resolve([]) : fetchNext();
+        for (let r = 0; r < take; r++) {
+          const row = batch[r];
+          for (let c = 0; c < names.length; c++) {
+            const v = row[c];
+            if (v === null || v === undefined) {
+              appender.appendNull();
+            } else {
+              appender.appendVarchar(v);
+            }
+          }
+          appender.endRow();
+        }
+        total += take;
+        staged += take;
+        if (staged >= IMPORT_CHUNK) {
+          appender.closeSync();
+          await flush();
+          appender = await this.conn.createAppender(staging, 'main', 'temp');
+          staged = 0;
+        }
+        opts.onProgress?.(total);
+        if (total >= limit) {
+          truncated = take < batch.length || (await next()).length > 0;
+          break;
+        }
+      }
+      appender.closeSync();
+      await flush();
+    } catch (err) {
+      try {
+        appender.closeSync();
+      } catch {
+        // already closed
+      }
+      await this.conn.run(`DROP TABLE IF EXISTS ${target}`);
+      throw err;
+    } finally {
+      await this.conn.run(`DROP TABLE IF EXISTS temp.${quoteIdent(staging)}`);
+    }
+    return { table: await this.register(name, source), truncated };
   }
 
   private async register(name: string, source: string): Promise<TableInfo> {

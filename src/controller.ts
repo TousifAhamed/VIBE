@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { DataEngine } from './engine/engine';
+import { DataEngine, ImportCancelled, type ImportResult } from './engine/engine';
 import type { HostMessage, WebviewMessage } from './protocol';
 
 /**
@@ -11,7 +11,34 @@ export class PanelController {
     private readonly engine: DataEngine,
     private readonly post: (msg: HostMessage) => void,
     private readonly pickFiles: () => Promise<string[]>,
+    private readonly openDatabase: () => Promise<void> = async () => undefined,
   ) {}
+
+  /** Runs a database import, reporting progress and the new table to the panel. */
+  async importData(
+    label: string,
+    task: (engine: DataEngine, progress: (rows: number) => void) => Promise<ImportResult>,
+  ): Promise<ImportResult | undefined> {
+    this.post({ type: 'loading', file: label });
+    let result: ImportResult | undefined;
+    let lastPost = 0;
+    const progress = (rows: number) => {
+      const now = Date.now();
+      if (now - lastPost > 250) {
+        lastPost = now;
+        this.post({ type: 'loading', file: `${label} (${rows.toLocaleString('en-US')} rows)` });
+      }
+    };
+    try {
+      result = await task(this.engine, progress);
+    } catch (err) {
+      if (!(err instanceof ImportCancelled)) {
+        this.post({ type: 'error', message: `Could not load ${label}: ${errorText(err)}` });
+      }
+    }
+    this.post({ type: 'tables', tables: this.engine.listTables(), active: result?.table.name });
+    return result;
+  }
 
   async loadFiles(files: string[]): Promise<void> {
     let active: string | undefined;
@@ -40,6 +67,9 @@ export class PanelController {
           }
           break;
         }
+        case 'openDatabase':
+          await this.openDatabase();
+          break;
         case 'getRows': {
           const [total, rows] = await Promise.all([
             this.engine.countRows(msg.table, msg.filter),
