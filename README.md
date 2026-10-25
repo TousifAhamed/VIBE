@@ -21,7 +21,7 @@ npm run build     # bundles dist/extension.js and dist/webview.js
 npm test          # builds, compiles the tests and runs them with node --test
 ```
 
-Press **F5** in VS Code to start an Extension Development Host, then run **VIBE: Open Data Panel** or **VIBE: Load Data File…**.
+Open the folder in VS Code and press **F5** ("Run VIBE Extension"). It builds first, then opens an Extension Development Host window where you run **VIBE: Open Data Panel** or **VIBE: Load Data File…**. After a code change, run `npm run build` (or keep `npm run watch` running) and reload that window with Ctrl+R.
 
 To work on the UI without VS Code, run the panel in a browser backed by the real engine:
 
