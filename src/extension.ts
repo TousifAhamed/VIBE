@@ -1,10 +1,13 @@
 import * as vscode from 'vscode';
 import { PanelController } from './controller';
-import { DataEngine } from './engine/engine';
+import { registerDatabases, type DataImporter } from './databases';
+import type { DatabaseService } from './db/service';
+import { DataEngine, type ImportResult } from './engine/engine';
 import type { HostMessage, WebviewMessage } from './protocol';
 
 let enginePromise: Promise<DataEngine> | undefined;
 let panel: DataPanel | undefined;
+let databases: DatabaseService | undefined;
 
 function getEngine(): Promise<DataEngine> {
   enginePromise ??= DataEngine.create();
@@ -20,7 +23,14 @@ async function pickFiles(): Promise<string[]> {
   return (uris ?? []).map((u) => u.fsPath);
 }
 
-class DataPanel {
+async function openDatabases(): Promise<void> {
+  await vscode.commands.executeCommand('vibe.databases.focus');
+  if (databases && databases.store.list().length === 0) {
+    await vscode.commands.executeCommand('vibe.db.addConnection');
+  }
+}
+
+class DataPanel implements DataImporter {
   private readonly controller: PanelController;
   private readonly ready: Promise<void>;
 
@@ -29,7 +39,7 @@ class DataPanel {
     engine: DataEngine,
     extensionUri: vscode.Uri,
   ) {
-    this.controller = new PanelController(engine, (m) => this.post(m), pickFiles);
+    this.controller = new PanelController(engine, (m) => this.post(m), pickFiles, openDatabases);
     webview.webview.html = renderHtml(webview.webview, extensionUri);
     let markReady!: () => void;
     this.ready = new Promise((resolve) => (markReady = resolve));
@@ -66,6 +76,14 @@ class DataPanel {
     );
   }
 
+  async importData(
+    label: string,
+    task: (engine: DataEngine, progress: (rows: number) => void) => Promise<ImportResult>,
+  ): Promise<ImportResult | undefined> {
+    await this.ready;
+    return this.controller.importData(label, task);
+  }
+
   private post(msg: HostMessage): void {
     if (msg.type === 'error') {
       void vscode.window.showErrorMessage(`VIBE: ${msg.message}`);
@@ -95,6 +113,7 @@ function renderHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  databases = registerDatabases(context, () => DataPanel.show(context));
   context.subscriptions.push(
     vscode.commands.registerCommand('vibe.openPanel', () => DataPanel.show(context)),
     vscode.commands.registerCommand('vibe.loadFile', async (uri?: vscode.Uri, selected?: vscode.Uri[]) => {
@@ -109,6 +128,7 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export async function deactivate(): Promise<void> {
+  await databases?.disconnectAll();
   if (enginePromise) {
     (await enginePromise).close();
   }

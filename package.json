@@ -1,7 +1,7 @@
 {
   "name": "vibe-analytics",
   "displayName": "VIBE Analytics",
-  "description": "Fast, in-editor data analysis: load CSV, TXT and Excel files into an in-memory DuckDB engine and explore them in a virtualized grid and interactive charts.",
+  "description": "Fast, in-editor data analysis: load CSV, TXT and Excel files or query Oracle and PostgreSQL into an in-memory DuckDB engine and explore them in a virtualized grid and interactive charts.",
   "version": "0.1.0",
   "publisher": "tousifahamed",
   "license": "MIT",
@@ -25,6 +25,51 @@
         "command": "vibe.loadFile",
         "title": "Load Data File…",
         "category": "VIBE"
+      },
+      {
+        "command": "vibe.db.addConnection",
+        "title": "Add Database Connection…",
+        "category": "VIBE",
+        "icon": "$(add)"
+      },
+      {
+        "command": "vibe.db.editConnection",
+        "title": "Edit Connection…",
+        "category": "VIBE"
+      },
+      {
+        "command": "vibe.db.removeConnection",
+        "title": "Remove Connection",
+        "category": "VIBE"
+      },
+      {
+        "command": "vibe.db.disconnect",
+        "title": "Disconnect",
+        "category": "VIBE"
+      },
+      {
+        "command": "vibe.db.refresh",
+        "title": "Refresh",
+        "category": "VIBE",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "vibe.db.loadTable",
+        "title": "Load into VIBE",
+        "category": "VIBE",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "vibe.db.newQuery",
+        "title": "New SQL Query",
+        "category": "VIBE",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "vibe.db.runQuery",
+        "title": "Run Query and Load into VIBE",
+        "category": "VIBE",
+        "icon": "$(play)"
       }
     ],
     "menus": {
@@ -34,7 +79,133 @@
           "when": "resourceExtname =~ /\\.(csv|tsv|txt|xlsx)$/i",
           "group": "navigation"
         }
+      ],
+      "view/title": [
+        {
+          "command": "vibe.db.addConnection",
+          "when": "view == vibe.databases",
+          "group": "navigation@1"
+        },
+        {
+          "command": "vibe.db.refresh",
+          "when": "view == vibe.databases",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "vibe.db.loadTable",
+          "when": "view == vibe.databases && viewItem == dbObject",
+          "group": "inline"
+        },
+        {
+          "command": "vibe.db.loadTable",
+          "when": "view == vibe.databases && viewItem == dbObject",
+          "group": "1_load@1"
+        },
+        {
+          "command": "vibe.db.newQuery",
+          "when": "view == vibe.databases && viewItem =~ /^(dbObject|schema|connection)$/",
+          "group": "1_load@2"
+        },
+        {
+          "command": "vibe.db.newQuery",
+          "when": "view == vibe.databases && viewItem == connection",
+          "group": "inline"
+        },
+        {
+          "command": "vibe.db.refresh",
+          "when": "view == vibe.databases && viewItem =~ /^(schema|connection)$/",
+          "group": "2_manage@1"
+        },
+        {
+          "command": "vibe.db.editConnection",
+          "when": "view == vibe.databases && viewItem == connection",
+          "group": "2_manage@2"
+        },
+        {
+          "command": "vibe.db.disconnect",
+          "when": "view == vibe.databases && viewItem == connection",
+          "group": "2_manage@3"
+        },
+        {
+          "command": "vibe.db.removeConnection",
+          "when": "view == vibe.databases && viewItem == connection",
+          "group": "3_remove@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "vibe.db.runQuery",
+          "when": "editorLangId == sql",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "vibe.db.editConnection",
+          "when": "false"
+        },
+        {
+          "command": "vibe.db.removeConnection",
+          "when": "false"
+        },
+        {
+          "command": "vibe.db.disconnect",
+          "when": "false"
+        },
+        {
+          "command": "vibe.db.loadTable",
+          "when": "false"
+        },
+        {
+          "command": "vibe.db.runQuery",
+          "when": "editorLangId == sql"
+        }
       ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "vibe",
+          "title": "VIBE",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "vibe": [
+        {
+          "id": "vibe.databases",
+          "name": "Databases",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "vibe.databases",
+        "contents": "Connect to Oracle or PostgreSQL, then load tables or run SQL straight into VIBE.\n[Add Connection](command:vibe.db.addConnection)\n[Open Data Panel](command:vibe.openPanel)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "vibe.db.runQuery",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
+        "when": "editorTextFocus && editorLangId == sql"
+      }
+    ],
+    "configuration": {
+      "title": "VIBE",
+      "properties": {
+        "vibe.database.maxRows": {
+          "type": "integer",
+          "default": 5000000,
+          "minimum": 0,
+          "markdownDescription": "Most rows loaded from one database table or query. `0` loads everything. Loads that hit the limit say so."
+        }
+      }
     }
   },
   "scripts": {
@@ -46,15 +217,21 @@
     "package": "node esbuild.mjs --production && vsce package"
   },
   "dependencies": {
-    "@duckdb/node-api": "1.5.6-r.1"
+    "@duckdb/node-api": "1.5.6-r.1",
+    "oracledb": "7.0.1"
   },
   "devDependencies": {
     "@types/node": "22.18.0",
+    "@types/oracledb": "7.0.3",
+    "@types/pg": "8.15.6",
+    "@types/pg-cursor": "2.7.2",
     "@types/vscode": "1.95.0",
     "@vscode/vsce": "^3.7.1",
     "echarts": "^6.1.0",
     "esbuild": "0.28.2",
     "exceljs": "4.4.0",
+    "pg": "8.20.0",
+    "pg-cursor": "2.15.0",
     "typescript": "5.9.3"
   },
   "repository": {

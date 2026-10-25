@@ -16,14 +16,16 @@ const app = document.getElementById('app')!;
 app.innerHTML = `
   <header class="toolbar">
     <button id="load" class="primary">Load file…</button>
+    <button id="db" title="Load a table or run SQL from Oracle or PostgreSQL">Database…</button>
     <select id="table" aria-label="Table" hidden></select>
     <span id="status" class="status"></span>
     <span id="filter" class="chip" hidden><span id="filter-text"></span><button id="filter-clear" title="Clear marking">×</button></span>
   </header>
   <section id="empty" class="empty">
     <h2>No data loaded yet</h2>
-    <p>Load a CSV, TXT or Excel file. It goes into an in-memory DuckDB engine, so even large files stay responsive.</p>
+    <p>Load a CSV, TXT or Excel file, or pull a table or SQL query from Oracle or PostgreSQL. Data goes into an in-memory DuckDB engine, so even large tables stay responsive.</p>
     <button id="load-empty" class="primary">Load file…</button>
+    <button id="db-empty">Connect to a database…</button>
   </section>
   <main id="workspace" class="workspace" hidden>
     <section class="pane grid-pane"><div id="grid" class="grid"></div></section>
@@ -162,6 +164,8 @@ for (const s of [ySelect, aggSelect, kindSelect]) {
 tableSelect.addEventListener('change', () => selectTable(tableSelect.value));
 $('load').addEventListener('click', () => send({ type: 'pickFile' }));
 $('load-empty').addEventListener('click', () => send({ type: 'pickFile' }));
+$('db').addEventListener('click', () => send({ type: 'openDatabase' }));
+$('db-empty').addEventListener('click', () => send({ type: 'openDatabase' }));
 $('filter-clear').addEventListener('click', () => {
   chart.clearMarking();
   filter = undefined;

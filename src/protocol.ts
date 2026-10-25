@@ -32,6 +32,7 @@ export type Cell = string | number | boolean | null;
 export type WebviewMessage =
   | { type: 'ready' }
   | { type: 'pickFile' }
+  | { type: 'openDatabase' }
   | { type: 'getRows'; reqId: number; table: string; offset: number; limit: number; sort?: SortSpec; filter?: FilterSpec }
   | { type: 'aggregate'; reqId: number; table: string; x: string; y: string | null; agg: Aggregation; orderBy: 'value' | 'label' };
 

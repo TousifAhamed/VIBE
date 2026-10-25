@@ -11,8 +11,10 @@ const configs = [
     platform: 'node',
     format: 'cjs',
     target: 'node20',
-    // Native DuckDB bindings ship as node_modules in the VSIX; everything else is bundled.
-    external: ['vscode', '@duckdb/node-api'],
+    // Native DuckDB bindings and node-oracledb (which loads optional native Thick-mode
+    // binaries dynamically) ship as node_modules in the VSIX; everything else is bundled.
+    // pg-native is an optional pg add-on that VIBE does not use.
+    external: ['vscode', '@duckdb/node-api', 'oracledb', 'pg-native'],
     sourcemap: !production,
     minify: production,
   },
